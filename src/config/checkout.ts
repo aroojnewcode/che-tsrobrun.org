@@ -20,7 +20,11 @@ export const CHECKOUT_SLUG_TO_PRODUCT = Object.fromEntries(
 
 /** Zadeyo affiliate URL for visible “Get access” / buy CTAs (same tab — no target=_blank). */
 export function checkoutPath(product: CheckoutProduct = 'robrun'): string {
-  return CHECKOUT[product];
+  const url = CHECKOUT[product];
+  if (url) return url;
+  const fromSlug = CHECKOUT_SLUG_TO_PRODUCT[product as string];
+  if (fromSlug) return CHECKOUT[fromSlug];
+  return CHECKOUT.robrun;
 }
 
 /** Internal /go/* path (blog links, bookmarks); real 302 to Zadeyo via _redirects / serve / middleware. */
