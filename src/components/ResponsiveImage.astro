@@ -31,11 +31,14 @@ const {
   desktopOnly = false,
 } = Astro.props;
 
+const isRemote = /^https?:\/\//i.test(src);
 const isRaster = /\.(png|jpe?g|webp)$/i.test(src);
-const srcSet = responsiveSrcSet(src, widths);
-const imgSrc = desktopOnly
-  ? 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-  : defaultWebpSrc(src, widths);
+const srcSet = isRemote ? undefined : responsiveSrcSet(src, widths);
+const imgSrc = isRemote
+  ? src
+  : desktopOnly
+    ? 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+    : defaultWebpSrc(src, widths);
 const pictureSizes = desktopOnly ? '(min-width: 1024px) 490px, 1px' : sizes;
 const pictureMedia = desktopOnly ? '(min-width: 1024px)' : undefined;
 ---
@@ -43,10 +46,10 @@ const pictureMedia = desktopOnly ? '(min-width: 1024px)' : undefined;
 {
   isRaster ? (
     <picture>
-      <source type="image/webp" srcset={srcSet} sizes={pictureSizes} media={pictureMedia} />
+      {srcSet && <source type="image/webp" srcset={srcSet} sizes={pictureSizes} media={pictureMedia} />}
       <img
         src={imgSrc}
-        srcset={desktopOnly ? undefined : srcSet}
+        srcset={desktopOnly || !srcSet ? undefined : srcSet}
         alt={alt}
         width={width}
         height={height}

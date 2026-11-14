@@ -1,5 +1,6 @@
 export declare const CHECKOUT_URLS: {
-  readonly warthunder: string;
+  readonly robrun: string;
+  readonly cloudDma: string;
   readonly skinChanger: string;
   readonly hwidSpoofer: string;
   readonly ugc: string;

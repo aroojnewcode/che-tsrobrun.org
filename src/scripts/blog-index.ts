@@ -81,3 +81,16 @@ export function initBlogIndexFilters(emptyMessage: string) {
   requestAnimationFrame(apply);
   window.setTimeout(apply, 0);
 }
+
+function bindBlogIndex() {
+  const root = document.querySelector<HTMLElement>('[data-blog-index]');
+  if (!root || root.dataset.blogIndexBound === 'true') return;
+  root.dataset.blogIndexBound = 'true';
+  const emptyMessage = root.getAttribute('data-blog-empty-msg') ?? 'No articles match this filter.';
+  initBlogIndexFilters(emptyMessage);
+}
+
+export function setupBlogIndexFilters() {
+  bindBlogIndex();
+  document.addEventListener('astro:page-load', bindBlogIndex);
+}

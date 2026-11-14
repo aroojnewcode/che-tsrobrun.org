@@ -1,9 +1,16 @@
+import { forumThreadSections } from './forumThreadSections';
+
 export interface ForumComment {
   author: string;
   age: string;
   score: number;
   body: string;
   replies?: ForumComment[];
+}
+
+export interface ForumSection {
+  heading: string;
+  paragraphs: string[];
 }
 
 export interface ForumPost {
@@ -17,235 +24,726 @@ export interface ForumPost {
   commentsCount: number;
   upvotes: number;
   flair?: string;
+  /** One-line friendly summary shown on index and thread pages */
+  tldr?: string;
   body: string[];
+  /** Subheaded sections (~one page with intro + replies) */
+  sections?: ForumSection[];
   comments: ForumComment[];
-  sourceTitle?: string;
-  sourcePath?: string;
+  /** Unix ms — used for “Latest” sort on the forum index */
+  publishedAt: number;
 }
 
 export const forumCategories = [
-  { name: 'General', tone: 'purple', icon: 'users' },
-  { name: 'Guides & Builds', tone: 'blue', icon: 'navBlog' },
-  { name: 'Patch Talk', tone: 'orange', icon: 'refresh' },
-  { name: 'Community', tone: 'green', icon: 'messageCircle' },
+  { name: 'ESP & Radar', tone: 'blue', icon: 'featureEsp' },
+  { name: 'Combat Tools', tone: 'purple', icon: 'toolkitCombat' },
+  { name: 'Utilities', tone: 'green', icon: 'featureUtilitySuite' },
+  { name: 'Patch & Loader', tone: 'orange', icon: 'refresh' },
+  { name: 'Off Topic', tone: 'green', icon: 'messageCircle' },
 ] as const;
 
-function guideDiscussion(input: {
-  slug: string;
-  title: string;
-  excerpt: string;
-  category: string;
-  categoryTone: ForumPost['categoryTone'];
-  sourceTitle: string;
-  sourcePath: string;
-  upvotes: number;
-  answer: string;
-  detail: string;
-  tip: string;
-}): ForumPost {
-  const { answer, detail, tip, ...post } = input;
-  return {
-    ...post,
-    author: 'guide_team',
-    age: '2 days ago',
-    commentsCount: 1,
-    flair: 'Guide Q&A',
-    body: [answer, detail],
-    comments: [{ author: 'guide_team', age: 'From the guide', score: 0, body: tip }],
-  };
+const DAY = 86_400_000;
+const now = Date.now();
+
+function countComments(comments: ForumComment[]): number {
+  return comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0);
 }
 
-const additionalGuidePosts: ForumPost[] = [
-  guideDiscussion({
-    slug: 'esp-include', title: 'What does Player ESP include before I buy?', upvotes: 73,
-    excerpt: 'Player ESP breakdown: boxes, vehicle tags, capture markers and radar covered in the ESP buy guide before checkout.',
-    category: 'Guides & Builds', categoryTone: 'blue', sourceTitle: 'ESP and radar setup for War Thunder', sourcePath: '/blog/esp/',
-    answer: 'The guide covers player boxes, names, health and distance, skeleton ESP, vehicle and objective markers, and the radar overlay. The exact options depend on the selected product tier.',
-    detail: 'It recommends starting with a restrained layout and enabling only the information you can read comfortably during a fight at a capture point or in urban cover.',
-    tip: 'Keep the overlay uncluttered: begin with players and the nearest vehicles, then adjust the distance filters one at a time.',
-  }),
-  guideDiscussion({
-    slug: 'esp-setup', title: 'How should I set up ESP overlay the first time?', upvotes: 58,
-    excerpt: 'First-time ESP overlay setup: enable basics, confirm on an Arcade test battle, then tune one setting at a time.',
-    category: 'Guides & Builds', categoryTone: 'blue', sourceTitle: 'ESP and radar setup for War Thunder', sourcePath: '/blog/esp/',
-    answer: 'Use the setup guide to enable the overlay, choose readable colors, and check that the indicators do not cover your HUD gauges, lead indicator or the crosshair.',
-    detail: 'Test your layout on a low-population or Arcade test battle before relying on it in a busy one. A simple configuration is easier to read than turning on every option immediately.',
-    tip: 'If the screen feels crowded, lower the vehicle ESP distance and hide low-priority AI before changing colors or sizes.',
-  }),
-  guideDiscussion({
-    slug: 'fov-settings', title: 'What FOV hack settings feel comfortable in PvP?', upvotes: 44,
-    excerpt: 'FOV hack tips: widen awareness without stretching the screen or making distant targets hard to track.',
-    category: 'Guides & Builds', categoryTone: 'blue', sourceTitle: 'FOV hack guide for War Thunder', sourcePath: '/blog/fov/',
-    answer: 'There is no single ideal FOV for every player. The guide recommends adjusting gradually and checking that you can still judge distance, recoil and enemy movement at range.',
-    detail: 'Keep a quick reset hotkey to the default FOV available so you can compare the wider view with familiar framing, especially for tank duels and close-range GRB fights.',
-    tip: 'Change one step at a time and spend a short session on an Arcade test battle before settling on a new value.',
-  }),
-  guideDiscussion({
-    slug: 'aim-smooth', title: 'How do Aimbot smoothing settings change soft aim?', upvotes: 32,
-    excerpt: 'Aimbot smoothing, FOV circles and why the PvP buy guide recommends conservative soft-aim tuning.',
-    category: 'Guides & Builds', categoryTone: 'blue', sourceTitle: 'Aimbot and ballistic assist for PvP', sourcePath: '/blog/aimbot/',
-    answer: 'Smoothing controls how quickly the crosshair moves toward a target. The guide recommends higher smoothing, a small FOV circle and a short test session before making any changes.',
-    detail: 'Changing one value at a time is easier to review than adjusting FOV, smoothing and bone selection together.',
-    tip: 'Keep a note of each configuration you try so you can return to the last setup that behaved as expected.',
-  }),
-  guideDiscussion({
-    slug: 'recoil-drill', title: 'Best way to test Ballistic assist weapon profiles?', upvotes: 29,
-    excerpt: 'Practice ballistic profiles one vehicle at a time on an Arcade test battle before live PvP.',
-    category: 'Guides & Builds', categoryTone: 'blue', sourceTitle: 'Aimbot bone select and recoil scripts for War Thunder', sourcePath: '/blog/bones/',
-    answer: 'Choose one vehicle lineup and one profile to test at a time. The guide walks through example profiles for tanks, fighters and SPAA, and explains how bone selection fits with ballistic assist.',
-    detail: 'An Arcade test battle lets you repeat the same burst on a target and see which values need adjustment without risking a live lineup.',
-    tip: 'Learn the manual gunnery pattern first; that makes it much easier to spot when a profile is over-compensating.',
-  }),
-  guideDiscussion({
-    slug: 'elite-tools', title: 'What extra tools ship with Elite tier cheats?', upvotes: 67,
-    excerpt: 'Elite tier vs Lite/Pro: SL/RP farm helpers, Camouflage unlock, priority patches and the full ESP suite.',
-    category: 'General', categoryTone: 'purple', sourceTitle: 'Elite tier guide: when to upgrade your cheat tools', sourcePath: '/blog/elite/',
-    answer: 'The guide describes Elite as including the Lite and Pro feature sets plus additional utilities such as SL/RP farm helpers, the full radar suite, priority patch delivery and Camouflage unlock.',
-    detail: 'It also covers who may benefit from the extra modules and why it makes sense to understand the simpler feature set first.',
-    tip: 'Compare the included features against your needs before choosing a tier; the full comparison is linked in the guide.',
-  }),
-  guideDiscussion({
-    slug: 'lite-pro', title: 'How do Lite tier and Pro cheat tiers differ?', upvotes: 53,
-    excerpt: 'Lite tier is ESP and radar; Pro adds aimbot and ballistic assist. Short buyer comparison before checkout.',
-    category: 'General', categoryTone: 'purple', sourceTitle: 'Lite tier vs Pro: which tier fits you', sourcePath: '/blog/lite-vs-pro/',
-    answer: 'The comparison guide describes Lite as focused on awareness tools such as player ESP, vehicle ESP, radar and FOV. Pro adds Aimbot, Soft Aim and Ballistic assist on top of that foundation.',
-    detail: 'The right choice depends on whether you need map information alone or also want the aim assist modules described in the comparison.',
-    tip: 'Use the full side-by-side comparison to check specific modules before making a decision.',
-  }),
-  guideDiscussion({
-    slug: 'skin-info', title: 'What should I know before buying Camouflage unlock?', upvotes: 38,
-    excerpt: 'Camouflage unlock / Unlock All: local camouflage and decal previews, limits, and what other players see.',
-    category: 'General', categoryTone: 'purple', sourceTitle: 'Skin changer and Unlock All for War Thunder', sourcePath: '/blog/skins/',
-    answer: 'The guide describes Camouflage unlock as a local cosmetic preview utility for vehicle camos and decals. It explains setup, supported options, and how to restore your default appearance.',
-    detail: 'Review the compatibility notes and follow the current setup instructions before using the utility.',
-    tip: 'Cosmetic changes are local previews that other players do not see; check the guide for current limitations and setup steps.',
-  }),
-  guideDiscussion({
-    slug: 'eac-init', title: 'Gaijin anti-cheat failed to initialize—what should I try first?', upvotes: 24,
-    excerpt: 'Gaijin account protection failed to initialize: verify Steam files and reinstall Gaijin anti-cheat before assuming a ban.',
-    category: 'Patch Talk', categoryTone: 'orange', sourceTitle: 'Gaijin account protection failed to initialize in War Thunder', sourcePath: '/blog/gaijin-error/',
-    answer: 'The troubleshooting guide says the message can result from game-file problems or software conflicts and does not always mean an account ban. First verify game files through Steam.',
-    detail: 'It also recommends fully exiting Steam, reinstalling Gaijin anti-cheat from the game install folder, restarting the PC, and checking for conflicting overlays or drivers before trying more disruptive steps.',
-    tip: 'Test a normal Steam launch before starting other software so you can narrow down the cause.',
-  }),
-  guideDiscussion({
-    slug: 'ext-loader', title: 'What does an External cheat loader mean?', upvotes: 46,
-    excerpt: 'External cheat loader explained: separate process, overlay UI, portal updates vs risky injectors.',
-    category: 'General', categoryTone: 'purple', sourceTitle: 'War Thunder external cheat guide', sourcePath: '/blog/external/',
-    answer: 'The article uses "external" to describe software that runs separately from the game process and presents its interface as an overlay.',
-    detail: 'It discusses the architecture at a high level and explains setup, patch updates, and the differences described between external and internal tools.',
-    tip: 'Check compatibility and current status information whenever the game or Gaijin anti-cheat receives an update.',
-  }),
-  guideDiscussion({
-    slug: 'stream-check', title: 'How do I check Stream-proof overlay in OBS?', upvotes: 21,
-    excerpt: 'Stream-proof setup: record an OBS test so ESP overlays stay off your VOD before you go live.',
-    category: 'Guides & Builds', categoryTone: 'blue', sourceTitle: 'Stream-proof overlay setup for War Thunder', sourcePath: '/blog/stream-proof/',
-    answer: 'Record a short local test with the exact OBS scene and capture mode you plan to use, then review the playback for any overlay elements.',
-    detail: 'The guide recommends testing game capture and display capture separately, since capture methods and multi-monitor setups can behave differently.',
-    tip: 'Do not rely on the preview alone; review a saved recording from the same scene you intend to stream.',
-  }),
-  guideDiscussion({
-    slug: 'hwid-check', title: 'After an Gaijin anti-cheat ban, what should I check on HWID?', upvotes: 33,
-    excerpt: 'HWID Spoofer vs new account after a Gaijin anti-cheat hardware flag—checks before Discord support.',
-    category: 'General', categoryTone: 'purple', sourceTitle: 'HWID spoofer vs new account after a Gaijin anti-cheat ban', sourcePath: '/blog/hwid/',
-    answer: 'Start by checking the account and device instructions for your product. The guide explains common HWID questions, when a new Steam account is enough, and when a reset request may be needed.',
-    detail: 'Avoid changing several system settings at once. If the product does not recognize your device, contact support with the relevant error details.',
-    tip: 'Use the official support path for device resets instead of relying on unrelated third-party tools.',
-  }),
-  guideDiscussion({
-    slug: 'pre-install', title: 'What to review before installing cheat tools?', upvotes: 18,
-    excerpt: 'Before installing cheat tools: status banner, Windows/Steam notes, and official setup on warthunder-cheats.com.',
-    category: 'Community', categoryTone: 'green', sourceTitle: 'cheat tools features: aimbot, ESP, ballistic assist and more', sourcePath: '/blog/features/',
-    answer: 'Read the feature and setup information first, confirm that it matches your system, and check the current update and status notes.',
-    detail: 'The site guide describes the available feature groups and links to more specific setup articles for individual modules.',
-    tip: 'Use the linked product and support pages as the source of truth for current availability and compatibility.',
-  }),
-  guideDiscussion({
-    slug: 'choose-tier', title: 'How do I choose the right cheat tier to buy?', upvotes: 48,
-    excerpt: 'Pick Lite, Pro or Elite cheat tools by feature set, then follow secure checkout on warthunder-cheats.com.',
-    category: 'Community', categoryTone: 'green', sourceTitle: 'How to buy cheat tools in 2026', sourcePath: '/blog/buy-guide/',
-    answer: 'The buying guide recommends comparing included features and choosing the tier that fits your needs before continuing through the official checkout.',
-    detail: 'It covers the purchase flow, account access, downloading the current build, and checking setup instructions before launching the game.',
-    tip: 'If you have a payment or account question, use the site support page and avoid sharing purchase details publicly.',
-  }),
-];
+function thread(
+  post: Omit<ForumPost, 'commentsCount'> & { comments: ForumComment[] },
+): ForumPost {
+  return { ...post, commentsCount: countComments(post.comments) };
+}
 
 export const forumPosts: ForumPost[] = [
-  {
-    slug: 'admin-official', category: 'General', categoryTone: 'purple',
-    title: 'Can I use test flight commands in live Arcade or Realistic battles?',
-    excerpt: 'Quick answer from the test flight console guide: dev commands only work in custom battles or test flight where you have host rights.',
-    author: 'guide_team', age: '2 hours ago', commentsCount: 3, upvotes: 128, flair: 'Guide Q&A',
-    sourceTitle: 'cheat codes guide: test flight console and dev / test flight commands for Arcade test battles', sourcePath: '/blog/cheat-codes/',
-    body: ['No. Console commands such as test flight, invulnerability and mission editor spawns need host or admin rights, which you only have in an Arcade test battle you host or a custom battle where the host granted you access. They do not work in live Arcade, Realistic or Simulator matchmaking.', 'Use an Arcade test battle or custom battle to practice gunnery and lead before you queue. The guide also explains the difference between those built-in test flight commands and third-party cheat tools on live battles.'],
-    comments: [
-      { author: 'base_builder_42', age: '1 hour ago', score: 24, body: 'Correct: host the custom battle, enable mission editor tools, then open the test flight / custom battle console from the keybind you set.' },
-      { author: 'ak_or_nothing', age: '48 min. ago', score: 11, body: 'The guide lists test flight, invulnerability and time controls for testing. Turn invulnerability off before you test real damage numbers.' },
-      { author: 'scrap_collector', age: '35 min. ago', score: 8, body: 'Useful distinction. Admin commands are a server feature, not a cheat product.' },
+  thread({
+    slug: 'welcome-read-first',
+    category: 'Off Topic',
+    categoryTone: 'green',
+    title: 'New buyer? Read this before your first ESP session',
+    excerpt:
+      'Five-minute checklist: test lobby, minimal overlay, panic key, and when to open a support ticket.',
+    author: 'buyer_onboarding',
+    age: 'Pinned',
+    upvotes: 128,
+    flair: 'Start here',
+    tldr: 'Test in a private lobby first—keep the overlay simple until you recognize every icon on screen.',
+    publishedAt: now - 30 * 60_000,
+    body: [
+      'Welcome—this forum is for quick buyer Q&A, not step-by-step guides. Start with one category filter (ESP & Radar is the usual pick).',
+      'Before going live: private lobby → enable only player boxes → set a panic key → note your Windows version. If the loader fails, skip straight to support with a screenshot.',
     ],
-  },
-  {
-    slug: 'f1-console', category: 'General', categoryTone: 'purple',
-    title: 'How do I open the test flight console?',
-    excerpt: 'Open the test flight or custom battle console from your keybind. Host tools are required before spawn commands work.',
-    author: 'guide_team', age: '4 hours ago', commentsCount: 2, upvotes: 86, flair: 'Guide Q&A',
-    sourceTitle: 'How to use cheat codes', sourcePath: '/blog/use-codes/',
-    body: ['Open the test flight or custom battle console from your keybind (often F1 in custom battles). In an Arcade test battle you host, enable mission editor tools so spawn and vehicle commands work.', 'If a command does nothing, confirm you are hosting or were granted host tools in that session and check the syntax in the mission editor reference.'],
     comments: [
-      { author: 'air_rb_main', age: '3 hours ago', score: 17, body: 'You can rebind the console key in the keybind settings if F1 conflicts with another program on your keyboard.' },
-      { author: 'carry_curious', age: '2 hours ago', score: 9, body: 'Commands need the right permission level; moderators cannot always run owner-only commands.' },
+      {
+        author: 'radar_mike',
+        age: '2 days ago',
+        score: 42,
+        body: 'Agree on panic key. Streamers should test OBS capture once before ranked sessions.',
+      },
+      {
+        author: 'support_reader',
+        age: '2 days ago',
+        score: 28,
+        body: 'Never paste order IDs here—use the support portal for HWID and payment issues.',
+      },
     ],
-  },
-  {
-    slug: 'spray-safe', category: 'Guides & Builds', categoryTone: 'blue',
-    title: 'Safest way to Practice lead and gunnery?',
-    excerpt: 'Practice gunnery on an Arcade test battle with a static target before live Realistic or Simulator queues.',
-    author: 'guide_team', age: '6 hours ago', commentsCount: 2, upvotes: 64, flair: 'Guide Q&A',
-    sourceTitle: 'War Thunder console cheats and tips', sourcePath: '/blog/console-tips/',
-    body: ['Practice on your own Arcade test battle. Spawn a target vehicle or use the gunnery range, fire controlled bursts from a fixed distance, and compare each pass so you can see dispersion and lead.', 'The guide also covers the free camera and test flight tools, which help you inspect capture lanes and airfields without waiting for a live match.'],
+  }),
+  thread({
+    slug: 'esp-include',
+    category: 'ESP & Radar',
+    categoryTone: 'blue',
+    title: 'What should Lite ESP show on a busy coastal server?',
+    excerpt:
+      'Trying to balance player boxes, cop alerts and vehicle tags without turning the screen into Christmas lights.',
+    author: 'coastal_runner',
+    age: '2 hours ago',
+    upvotes: 94,
+    flair: 'Question',
+    tldr: 'Turn on players and vehicles first; add loot ESP only after the layout feels readable.',
+    publishedAt: now - 2 * 3_600_000,
+    body: [
+      'I picked up Lite mostly for player ESP and the mini radar. On coastal PvP there are cops, civilians and duos in cars everywhere.',
+      'What do you actually leave enabled for a first session—skeletons on, max distance, loot boxes? Curious what everyone runs before they start tweaking colors.',
+    ],
     comments: [
-      { author: 'stack_and_pull', age: '5 hours ago', score: 13, body: 'I bracket each burst on the target to see dispersion. It makes controlling a T-72 main-gun pattern much easier to learn.' },
-      { author: 'map_reader', age: '4 hours ago', score: 6, body: 'The free camera is handy when you want to check angles on a capture point before a major patch.' },
+      {
+        author: 'radar_mike',
+        age: '1 hour ago',
+        score: 31,
+        body: 'Start with players + vehicles only, 150–200m cap. Add loot ESP after you can read tags without staring at the overlay.',
+        replies: [
+          {
+            author: 'coastal_runner',
+            age: '55 min ago',
+            score: 8,
+            body: 'That helped—dropping loot tags until I learned cop colors stopped the clutter.',
+          },
+        ],
+      },
+      {
+        author: 'night_raid_99',
+        age: '48 min ago',
+        score: 19,
+        body: 'Bind a panic key that toggles ESP off if you stream or clip highlights. Saved me twice when a friend joined Discord share.',
+      },
     ],
-  },
-  {
-    slug: 'after-patch', category: 'Patch Talk', categoryTone: 'orange',
-    title: 'What should I check before playing after a Gaijin anti-cheat or game patch?',
-    excerpt: 'The patch-day checklist recommends checking build status, updating, and testing on an Arcade test battle before a real session.',
-    author: 'guide_team', age: '9 hours ago', commentsCount: 2, upvotes: 42, flair: 'Guide Q&A',
-    sourceTitle: 'Gaijin anti-cheat patch day checklist for cheat tools', sourcePath: '/blog/gaijin-patch/',
-    body: ['Check the current build and status notice first. After a game or Gaijin anti-cheat update, wait for a compatible build, update the loader, then verify the setup on an Arcade test battle before returning to busy Arcade, Realistic or Simulator queues.', 'If anything behaves unexpectedly, stop and review the status notes rather than assuming the old setup still applies. The checklist covers the patch-day routine in more detail.'],
+  }),
+  thread({
+    slug: 'esp-setup',
+    category: 'ESP & Radar',
+    categoryTone: 'blue',
+    title: 'First overlay test—ESP lines up but radar feels offset',
+    excerpt:
+      'Loot and player boxes look correct in a private lobby, but the corner radar lags a block behind my actual position.',
+    author: 'fence_line_duo',
+    age: '5 hours ago',
+    upvotes: 61,
+    flair: 'Troubleshooting',
+    publishedAt: now - 5 * 3_600_000,
+    body: [
+      'Ran my first Lite session on a low-pop server. ESP distance and skeleton colors are fine, but the radar blip drifts when I sprint around corners.',
+      'Anyone else see desync between world ESP and the radar panel? Windows 11, 1080p fullscreen borderless.',
+    ],
     comments: [
-      { author: 'patch_day_vet', age: '8 hours ago', score: 12, body: 'Testing after the update before a real session is the part I used to skip. Now I check the build note and run a quick Arcade test battle.' },
-      { author: 'roamer_main_5', age: '7 hours ago', score: 7, body: 'Agree. If the status has not caught up, wait. A checklist is better than guessing.' },
+      {
+        author: 'urban_esp',
+        age: '4 hours ago',
+        score: 22,
+        body: 'Switch to borderless windowed once, reload preset, then back to fullscreen. Fixed offset for me after a patch week.',
+      },
+      {
+        author: 'loot_watcher',
+        age: '3 hours ago',
+        score: 11,
+        body: 'Also lower radar scale—at 1.4x the lag is more obvious on tight maps.',
+      },
     ],
-  },
-  {
-    slug: 'lite-or-pro', category: 'Community', categoryTone: 'green',
-    title: 'Lite tier or Pro: which tier includes aim assist?',
-    excerpt: 'Lite tier is vision tools; Pro adds aimbot and recoil. See which cheat tier to buy for your PvP style.',
-    author: 'guide_team', age: '12 hours ago', commentsCount: 1, upvotes: 31, flair: 'Guide Q&A',
-    sourceTitle: 'Lite tier vs Pro: which tier fits you', sourcePath: '/blog/lite-vs-pro/',
-    body: ['According to the comparison guide, Lite centers on awareness features such as player ESP, vehicle ESP, radar, FOV and stream-proof options. Pro includes those features and adds Aimbot, Soft Aim, Bone Select, Trigger Bot and Ballistic assist.', 'The best fit depends on which features you need. Read the full comparison before choosing.'],
+  }),
+  thread({
+    slug: 'fov-settings',
+    category: 'ESP & Radar',
+    categoryTone: 'blue',
+    title: 'FOV hack vs native FOV—what feels fair in CQB?',
+    excerpt: 'Wider FOV helps peeking alleys but I lose track of SMG recoil. Looking for sensible defaults.',
+    author: 'reef_bar_main',
+    age: '8 hours ago',
+    upvotes: 44,
+    flair: 'Discussion',
+    publishedAt: now - 8 * 3_600_000,
+    body: [
+      'Lite FOV module is nice for indoor fights but I overdid it and everything looked stretched. What multiplier do you leave for bar interior fights?',
+    ],
     comments: [
-      { author: 'one_more_raid', age: '10 hours ago', score: 10, body: 'The comparison page is useful because it shows which modules are included in each tier instead of only listing headlines.' },
+      {
+        author: 'smg_sweeper',
+        age: '7 hours ago',
+        score: 17,
+        body: '+10–15% max for me. Anything past that and tracking feels floaty.',
+      },
     ],
-  },
-  {
-    slug: 'spray-server', category: 'Guides & Builds', categoryTone: 'blue',
-    title: 'Practice gunnery without risking a live lineup?',
-    excerpt: 'Host an Arcade test battle, spawn a target and use mission editor tools for repeatable tank and SPAA drills.',
-    author: 'guide_team', age: '1 day ago', commentsCount: 2, upvotes: 27, flair: 'Guide Q&A',
-    sourceTitle: 'cheat codes guide: test flight console and dev / test flight commands for Arcade test battles', sourcePath: '/blog/cheat-codes/',
-    body: ['Start an Arcade test battle and host the session. Use mission editor spawns to add a vehicle and ammo, then respawn between attempts so every drill starts from the same state.', 'For realistic practice, turn invulnerability off before drilling. These tools are for sessions you host; the linked guide has the full setup steps.'],
+  }),
+  thread({
+    slug: 'stream-check',
+    category: 'ESP & Radar',
+    categoryTone: 'blue',
+    title: 'Stream-proof check failed on second monitor',
+    excerpt: 'ESP hidden on main display capture but flashed on Discord stream of monitor 2.',
+    author: 'clip_friendly',
+    age: '1 day ago',
+    upvotes: 28,
+    flair: 'OBS',
+    publishedAt: now - DAY,
+    body: [
+      'Recorded a 30s clip with OBS game capture—clean. Friend streamed my second monitor and saw player boxes. Is stream-proof per-monitor or global?',
+    ],
     comments: [
-      { author: 'ak_or_nothing', age: '20 hours ago', score: 10, body: 'Start with a static target and repeat the same burst until lead and dispersion feel automatic.' },
-      { author: 'base_builder_42', age: '18 hours ago', score: 5, body: 'Turn invulnerability off when you want to practice with normal damage and repair constraints.' },
+      {
+        author: 'obs_tinker',
+        age: '20 hours ago',
+        score: 14,
+        body: 'Capture only the game display in OBS; disable display capture on dual setup. Retest with a private VOD before going live.',
+      },
     ],
-  },
-  ...additionalGuidePosts,
+  }),
+  thread({
+    slug: 'aim-smooth',
+    category: 'Combat Tools',
+    categoryTone: 'purple',
+    title: 'Pro soft aim—smoothing 6 feels robotic, 12 feels late',
+    excerpt: 'Trying to find human-looking settings for police chases without snapping.',
+    author: 'pvp_lane',
+    age: '3 hours ago',
+    upvotes: 72,
+    flair: 'Pro tier',
+    publishedAt: now - 3 * 3_600_000,
+    body: [
+      'Upgraded to Pro for soft aim on SMG fights. FOV circle at 4° but smoothing is the hard part—either obvious or too slow for cops rushing me.',
+    ],
+    comments: [
+      {
+        author: 'bone_picker',
+        age: '2 hours ago',
+        score: 26,
+        body: 'Try smoothing 9, chest bone, activation on ADS only. Test in a private lobby before cops-only servers.',
+      },
+      {
+        author: 'pvp_lane',
+        age: '1 hour ago',
+        score: 9,
+        body: 'ADS-only was the missing piece, thanks.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'recoil-drill',
+    category: 'Combat Tools',
+    categoryTone: 'purple',
+    title: 'No-recoil profile for AK—still climbs on long bursts',
+    excerpt: 'Pro no-recoil assist on but third bullet still kicks up in fence fights.',
+    author: 'ak_or_nothing',
+    age: '6 hours ago',
+    upvotes: 39,
+    flair: 'Help',
+    publishedAt: now - 6 * 3_600_000,
+    body: [
+      'Copied a community AK profile from Discord and toned it down 20%. Still loses control after 5–6 rounds. Separate profiles per weapon or one universal?',
+    ],
+    comments: [
+      {
+        author: 'spray_control',
+        age: '5 hours ago',
+        score: 18,
+        body: 'Per-weapon. Generic profiles never match Rob Run recoil patterns after the last patch.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'elite-tools',
+    category: 'Combat Tools',
+    categoryTone: 'purple',
+    title: 'Elite farm helpers—worth it if I only play weekends?',
+    excerpt: 'Casual player wondering if cash/loot helpers matter for 8 hours a week.',
+    author: 'weekend_warrior',
+    age: '12 hours ago',
+    upvotes: 51,
+    flair: 'Elite',
+    publishedAt: now - 12 * 3_600_000,
+    body: [
+      'Already on Pro and happy. Elite slot opened up—mainly interested in farm routes and cosmetic preview. Do helpers need daily monitoring?',
+    ],
+    comments: [
+      {
+        author: 'elite_grinder',
+        age: '10 hours ago',
+        score: 21,
+        body: 'If you only raid weekends, Pro is enough unless you grind cash deliberately. Preview is nice for skins without market buys.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'lite-pro',
+    category: 'Combat Tools',
+    categoryTone: 'purple',
+    title: 'Staying on Lite or biting the bullet for Pro?',
+    excerpt: 'ESP is enough for duo loot runs but we lose every cop chase.',
+    author: 'duo_extract',
+    age: '1 day ago',
+    upvotes: 67,
+    flair: 'Poll',
+    publishedAt: now - DAY - 2 * 3_600_000,
+    body: [
+      'Two-man team: Lite ESP/radar saved us a ton of wipes. Close fights we still lose to cops with SMGs. Is Pro aim assist the usual upgrade path?',
+    ],
+    comments: [
+      {
+        author: 'one_more_raid',
+        age: '22 hours ago',
+        score: 24,
+        body: 'Most squads go Lite → Pro when they start hunting players, not just loot. Soft aim + no-recoil is the jump.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'hwid-check',
+    category: 'Utilities',
+    categoryTone: 'green',
+    title: 'HWID flag—new Steam account or spoofer first?',
+    excerpt: 'EAC hardware ban message after a bad week. Main PC only, no alt parts.',
+    author: 'flagged_pc',
+    age: '9 hours ago',
+    upvotes: 33,
+    flair: 'HWID',
+    publishedAt: now - 9 * 3_600_000,
+    body: [
+      'Got the hardware ban popup. Account is toast but I need this PC for work. Did people spoof first or buy HWID utility before a new account?',
+    ],
+    comments: [
+      {
+        author: 'restore_point',
+        age: '8 hours ago',
+        score: 15,
+        body: 'Restore point + compatibility scan from the portal before anything else. New account on same disk without spoof is asking for a reconnect.',
+      },
+      {
+        author: 'support_reader',
+        age: '6 hours ago',
+        score: 11,
+        body: 'Open a support ticket with error screenshot—don’t stack random registry cleaners.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'skin-info',
+    category: 'Utilities',
+    categoryTone: 'green',
+    title: 'Unlock All—do preview skins show in screenshots?',
+    excerpt: 'Want thumbnails for Discord without buying every camo.',
+    author: 'style_tester',
+    age: '14 hours ago',
+    upvotes: 22,
+    flair: 'Cosmetics',
+    publishedAt: now - 14 * 3_600_000,
+    body: [
+      'Standalone Unlock All for local preview. Screenshots show the camo on my character but friends say they still see my real inventory in-game. Expected?',
+    ],
+    comments: [
+      {
+        author: 'local_only',
+        age: '12 hours ago',
+        score: 19,
+        body: 'Yeah—client-side only. Great for planning loadouts, not for flexing in lobby.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'eac-init',
+    category: 'Patch & Loader',
+    categoryTone: 'orange',
+    title: 'Easy Anti-Cheat failed to initialize after Windows update',
+    excerpt: 'Game won’t launch—EAC error before main menu. Cheat not even loaded yet.',
+    author: 'patch_victim',
+    age: '4 hours ago',
+    upvotes: 41,
+    flair: 'EAC',
+    publishedAt: now - 4 * 3_600_000,
+    body: [
+      'KB503xxx installed overnight. Rob Run dies on EAC init. Verified files, reinstalled EAC, still stuck. Anyone fixed without reinstalling Windows?',
+    ],
+    comments: [
+      {
+        author: 'eac_vet',
+        age: '3 hours ago',
+        score: 20,
+        body: 'Disable overlay software (GeForce, Discord legacy overlay), reboot, run EAC setup exe as admin from the game folder.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'after-patch',
+    category: 'Patch & Loader',
+    categoryTone: 'orange',
+    title: 'Post-patch ritual—how long do you wait before live raids?',
+    excerpt: 'Status says testing; Discord says online. Who actually waits?',
+    author: 'patch_day_vet',
+    age: '7 hours ago',
+    upvotes: 58,
+    flair: 'Patch day',
+    publishedAt: now - 7 * 3_600_000,
+    body: [
+      'New build dropped. I usually private lobby 10 minutes, then one low-pop extract before bringing out the main account. Overkill or normal?',
+    ],
+    comments: [
+      {
+        author: 'roamer_main_5',
+        age: '6 hours ago',
+        score: 16,
+        body: 'Same flow. If radar offsets after patch, I stop until a micro-build posts.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'ext-loader',
+    category: 'Patch & Loader',
+    categoryTone: 'orange',
+    title: 'Loader opens but overlay hotkey does nothing',
+    excerpt: 'Portal download fine, game runs, INSERT does not toggle menu.',
+    author: 'loader_stuck',
+    age: '11 hours ago',
+    upvotes: 36,
+    flair: 'Loader',
+    publishedAt: now - 11 * 3_600_000,
+    body: [
+      'Fresh Pro key. Loader injects without error text but overlay never shows. Tried running as admin and excluding from Defender. What am I missing?',
+    ],
+    comments: [
+      {
+        author: 'hotkey_guru',
+        age: '10 hours ago',
+        score: 22,
+        body: 'Check conflict with Steam overlay and GPU overlay both off. Rebind menu key in portal profile and save before launch.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'pre-install',
+    category: 'Utilities',
+    categoryTone: 'green',
+    title: 'Cloud DMA worth it on a single PC?',
+    excerpt: 'Saw the utility page—thought DMA always meant two machines.',
+    author: 'single_rig',
+    age: '2 days ago',
+    upvotes: 29,
+    flair: 'Cloud DMA',
+    publishedAt: now - 2 * DAY,
+    body: [
+      'Only one gaming box. Cloud DMA still useful or is it strictly dual-PC? Trying to reduce local footprint after a scare.',
+    ],
+    comments: [
+      {
+        author: 'bridge_host',
+        age: '1 day ago',
+        score: 13,
+        body: 'Dual-PC is the common setup. Cloud bridge still needs a host for the feed—read the compatibility scan before buying.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'choose-tier',
+    category: 'Off Topic',
+    categoryTone: 'green',
+    title: 'New here—how active is this forum vs Discord?',
+    excerpt: 'Prefer reading threads over scrolling #support.',
+    author: 'lurker_101',
+    age: '3 days ago',
+    upvotes: 47,
+    flair: 'Meta',
+    publishedAt: now - 3 * DAY,
+    body: [
+      'Found the site through a tier comparison. Is this forum synced with Discord or separate buyer discussions only?',
+    ],
+    comments: [
+      {
+        author: 'mod_style',
+        age: '2 days ago',
+        score: 28,
+        body: 'Mostly buyer threads here. Patch emergencies and ticket responses still go to Discord support.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'admin-official',
+    category: 'Off Topic',
+    categoryTone: 'green',
+    title: 'Share your loot route for coastal duos (no coords pls)',
+    excerpt: 'Looking for general timing tips—when to hit gas stations vs docks.',
+    author: 'coastal_duo',
+    age: '18 hours ago',
+    upvotes: 83,
+    flair: 'Routes',
+    publishedAt: now - 18 * 3_600_000,
+    body: [
+      'ESP makes it easy to spot squads but we keep third-partying at the wrong time. How do you rotate when radar shows two teams on the same pier?',
+    ],
+    comments: [
+      {
+        author: 'map_reader',
+        age: '16 hours ago',
+        score: 25,
+        body: 'Wait for first contact audio—if one team wipes fast, push the rez window. Otherwise circle wide with vehicle ESP off until tags thin.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'lite-or-pro',
+    category: 'Combat Tools',
+    categoryTone: 'purple',
+    title: 'Trigger bot too obvious on pistol fights?',
+    excerpt: 'Pro trigger fired on a cop through a bush—felt like instant pref fire.',
+    author: 'trigger_shy',
+    age: '1 day ago',
+    upvotes: 31,
+    flair: 'Pro',
+    publishedAt: now - DAY - 4 * 3_600_000,
+    body: [
+      'Turned trigger assist on with a high delay but it still snapped when a player crossed a gap. Disable for pistols only or tune delay more?',
+    ],
+    comments: [
+      {
+        author: 'legit_aim',
+        age: '20 hours ago',
+        score: 14,
+        body: 'Separate weapon class config. Pistols off or delay 120ms+ if you insist.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'spray-server',
+    category: 'ESP & Radar',
+    categoryTone: 'blue',
+    title: 'Radar range for night raids—300m too noisy?',
+    excerpt: 'Night map players blend in; radar picks every AI and static prop.',
+    author: 'night_owl',
+    age: '2 days ago',
+    upvotes: 26,
+    flair: 'Radar',
+    publishedAt: now - 2 * DAY - 3 * 3_600_000,
+    body: [
+      'Dropping player-only filter helps but AI dots still flood the panel. Anyone run a night preset they can share settings for (not a full config dump)?',
+    ],
+    comments: [
+      {
+        author: 'radar_mike',
+        age: '1 day ago',
+        score: 11,
+        body: 'Cut AI layer, 180m player cap, brighten player color only. Makes audio cues readable again.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'f1-console',
+    category: 'Off Topic',
+    categoryTone: 'green',
+    title: 'Missed the sale—does checkout still bundle Unlock All with Elite?',
+    excerpt: 'Saw old posts saying preview included; cart only shows combat modules.',
+    author: 'sale_watcher',
+    age: '2 days ago',
+    upvotes: 19,
+    flair: 'Checkout',
+    publishedAt: now - 2 * DAY,
+    body: [
+      'Elite page lists cosmetic preview but my checkout link does not mention it. Did bundle wording change?',
+    ],
+    comments: [
+      {
+        author: 'tier_checker',
+        age: '36 hours ago',
+        score: 8,
+        body: 'Elite still includes preview per product page—refresh portal after payment, modules unlock separately.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'spray-safe',
+    category: 'Combat Tools',
+    categoryTone: 'purple',
+    title: 'Pro on laptop iGPU—FPS tank when ESP + aim both on',
+    excerpt: 'GTX 1650 mobile, 60fps drops to 40 with full Pro stack.',
+    author: 'laptop_heat',
+    age: '3 days ago',
+    upvotes: 34,
+    flair: 'Performance',
+    publishedAt: now - 3 * DAY,
+    body: [
+      'Thermal throttling after 20 minutes. Disable skeletons or lower ESP refresh first?',
+    ],
+    comments: [
+      {
+        author: 'fps_first',
+        age: '2 days ago',
+        score: 17,
+        body: 'Boxes only, 30Hz ESP refresh, aim FOV smaller. Laptop dies with “everything on”.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'esp-colorblind',
+    category: 'ESP & Radar',
+    categoryTone: 'blue',
+    title: 'ESP colors for color-blind setup—what actually works?',
+    excerpt:
+      'Red/green player tags blend together for me. Looking for a high-contrast preset that still looks normal on stream.',
+    author: 'cb_friendly',
+    age: '4 hours ago',
+    upvotes: 37,
+    flair: 'Accessibility',
+    tldr: 'Use blue vs yellow for enemies/teammates and thicker boxes—skeletons can stay off until you are comfortable.',
+    publishedAt: now - 4 * 3_600_000,
+    body: [
+      'Deutans here. Default presets are rough on coastal maps at dusk. I do not need crazy colors—just a combo that reads fast when three tags stack.',
+      'Happy to share hex codes if someone has a calm palette that does not glow neon in clips.',
+    ],
+    comments: [
+      {
+        author: 'loot_watcher',
+        age: '3 hours ago',
+        score: 21,
+        body: 'Blue enemy + amber squad + white vehicles. Bump box thickness one step instead of neon saturation.',
+      },
+      {
+        author: 'clip_friendly',
+        age: '2 hours ago',
+        score: 9,
+        body: 'If you stream, mute saturation before testing—what looks fine solo can blow out on capture.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'wrong-tier-help',
+    category: 'Off Topic',
+    categoryTone: 'green',
+    title: 'Bought Pro but only wanted ESP—can I switch tiers?',
+    excerpt:
+      'Checkout went through and I opened the portal. Lite might have been enough; scared to mess up the license.',
+    author: 'first_purchase',
+    age: '6 hours ago',
+    upvotes: 52,
+    flair: 'Billing',
+    tldr: 'Open support with your order email—staff can point you to the right tier without you guessing in the portal.',
+    publishedAt: now - 6 * 3_600_000,
+    body: [
+      'Brand-new buyer. I clicked Pro because the comparison table mentioned aim assist, but all I need right now is ESP and radar for duo loot.',
+      'Is there a clean upgrade/downgrade path or do I burn the key? I have not injected yet.',
+    ],
+    comments: [
+      {
+        author: 'support_reader',
+        age: '5 hours ago',
+        score: 34,
+        body: 'If you have not injected, support can usually sort tier moves fast. Include purchase email—no passwords in this thread.',
+      },
+      {
+        author: 'duo_extract',
+        age: '4 hours ago',
+        score: 12,
+        body: 'Many teams start Lite and move to Pro later anyway. If you already paid, see what support offers before you panic-buy twice.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'duo-radar-comms',
+    category: 'ESP & Radar',
+    categoryTone: 'blue',
+    title: 'Duos: how do you call radar contacts without tunnel vision?',
+    excerpt:
+      'Driver watches radar, passenger loots—we keep talking over each other when four blips stack.',
+    author: 'driver_passenger',
+    age: '10 hours ago',
+    upvotes: 41,
+    flair: 'Duo play',
+    tldr: 'Call only “two threats north-east” style pings; driver keeps voice short so passenger is not staring at the minimap.',
+    publishedAt: now - 10 * 3_600_000,
+    body: [
+      'We run Lite with shared Discord. Radar shows more than we can say in three seconds. Do you trim AI dots, lower range, or use a callout map grid?',
+    ],
+    comments: [
+      {
+        author: 'map_reader',
+        age: '9 hours ago',
+        score: 18,
+        body: 'Driver owns radar audio. Passenger repeats only threat count + direction. 150m cap stops info overload.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'patch-status-check',
+    category: 'Patch & Loader',
+    categoryTone: 'orange',
+    title: 'Where do you check if cheats are safe after a Rob Run patch?',
+    excerpt:
+      'Game updated overnight—Discord is loud, status page is quieter. What is the sane order of checks?',
+    author: 'patch_day_newbie',
+    age: '1 day ago',
+    upvotes: 64,
+    flair: 'Patch day',
+    tldr: 'Portal status → short private test → one low-pop raid. Skip mains until a micro-build posts.',
+    publishedAt: now - DAY - 6 * 3_600_000,
+    body: [
+      'Second patch since I bought in. I do not want to toast a key because I rushed. What is your actual checklist when the game version bumps?',
+    ],
+    comments: [
+      {
+        author: 'patch_day_vet',
+        age: '22 hours ago',
+        score: 27,
+        body: 'Same as the vets here: read portal banner, test 5 minutes solo, then one quiet extract. Discord rumors come after that—not before.',
+      },
+      {
+        author: 'eac_vet',
+        age: '20 hours ago',
+        score: 14,
+        body: 'If EAC itself fails before the menu, fix that first—cheat stack is irrelevant until the game launches clean.',
+      },
+    ],
+  }),
+  thread({
+    slug: 'report-thread-safely',
+    category: 'Patch & Loader',
+    categoryTone: 'orange',
+    title: 'Reporting a loader bug in public—what is safe to share?',
+    excerpt:
+      'Want to ask if anyone else sees error 0x… without leaking account info or paste dumps.',
+    author: 'safe_reporter',
+    age: '15 hours ago',
+    upvotes: 29,
+    flair: 'Etiquette',
+    tldr: 'Share Windows version + error text + tier—never keys, emails, or full log files in open threads.',
+    publishedAt: now - 15 * 3_600_000,
+    body: [
+      'Loader times out on inject but the game runs fine without the tool. I can reproduce but I do not know what is okay to post here vs support.',
+    ],
+    comments: [
+      {
+        author: 'support_reader',
+        age: '14 hours ago',
+        score: 22,
+        body: 'Forum: symptom + build number + “already tried reboot.” Support: screenshot + ticket ID stuff. Never paste license strings publicly.',
+      },
+    ],
+  }),
 ];
 
+function enrichPost(post: ForumPost): ForumPost {
+  const sections = forumThreadSections[post.slug];
+  if (!sections?.length) return post;
+  return { ...post, sections };
+}
+
 export function getForumPost(slug: string): ForumPost | undefined {
-  return forumPosts.find((post) => post.slug === slug);
+  const post = forumPosts.find((p) => p.slug === slug);
+  return post ? enrichPost(post) : undefined;
+}
+
+/** Index cards can show section count / full list uses enriched posts. */
+export function getForumPostsEnriched(): ForumPost[] {
+  return forumPosts.map(enrichPost);
 }

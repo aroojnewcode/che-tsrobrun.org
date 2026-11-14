@@ -1,3 +1,7 @@
+import { setupBlogIndexFilters } from './blog-index';
+import { setupForumIndex } from './forum-index';
+import { initForumVotes } from './forum-votes';
+
 function initFonts() {
   const root = document.documentElement;
 
@@ -108,6 +112,9 @@ function bootSite() {
   initInPageScroll();
   initSkipLink();
   initThemeMetaColor();
+  setupBlogIndexFilters();
+  setupForumIndex();
+  initForumVotes();
 }
 
 if (document.readyState === 'loading') {

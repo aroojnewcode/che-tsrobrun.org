@@ -1,7 +1,7 @@
-export const SITE_DOMAIN = 'warthunder-cheats.com';
+export const SITE_DOMAIN = 'cheatsrobrun.org';
 export const SITE_URL = `https://${SITE_DOMAIN}`;
-export const PRODUCT_BASE = '/products/warthunder-cheats/';
-export const TITLE_PREFIX = 'War Thunder Cheats & Hacks';
+export const PRODUCT_BASE = '/products/rob-run-cheats/';
+export const TITLE_PREFIX = 'Rob Run Cheats & Hacks';
 export const SUPPORT_EMAIL = `support@${SITE_DOMAIN}`;
 /** Discord invite for support tickets. Override with PUBLIC_DISCORD_URL. */
 export const DISCORD_URL =

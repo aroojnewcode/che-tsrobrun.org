@@ -13,7 +13,9 @@ async function optimizeDir(relativeDir) {
   const dir = path.join(root, relativeDir);
   if (!fs.existsSync(dir)) return;
 
-  const files = fs.readdirSync(dir).filter((file) => /\.png$/i.test(file) && !/-\d+\.webp$/i.test(file));
+  const files = fs.readdirSync(dir).filter(
+    (file) => /\.png$/i.test(file) && !/-\d+\.webp$/i.test(file) && !/^wt-/i.test(file),
+  );
 
   for (const file of files) {
     const input = path.join(dir, file);

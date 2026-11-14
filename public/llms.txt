@@ -1,0 +1,23 @@
+# Rob Run Cheats (cheatsrobrun.org)
+
+> Official storefront for Rob Run on Windows PC—Lite, Pro and Elite cheat tiers plus HWID Spoofer, UGC and utilities. This file lists preferred URLs for assistants and crawlers.
+
+## Priority pages
+
+- [Home](https://cheatsrobrun.org/): Tier overview, live status banner, checkout entry
+- [Products hub](https://cheatsrobrun.org/products/rob-run-cheats/): Compare Lite, Pro, Elite and utilities
+- [Lite tier](https://cheatsrobrun.org/products/rob-run-cheats/lite/): Player ESP, skeleton ESP, radar, FOV—no aimbot
+- [Pro tier](https://cheatsrobrun.org/products/rob-run-cheats/pro/): Aimbot, soft aim, no-recoil assist on top of Lite
+- [Elite tier](https://cheatsrobrun.org/products/rob-run-cheats/elite/): Full stack plus farm helpers, cosmetic preview, priority patch queue
+- [FAQ](https://cheatsrobrun.org/faq/): Checkout, ban risk, tiers, loader and HWID answers
+- [Blog index](https://cheatsrobrun.org/blog/): ESP, aimbot, patch-day and setup guides
+- [Support](https://cheatsrobrun.org/support/): Discord tickets after purchase
+- [About](https://cheatsrobrun.org/about/): Who we are, disclaimers, tier scope, patch policy
+- [Terms of sale](https://cheatsrobrun.org/terms/): License, refunds, acceptable use
+
+## Notes
+
+- cheatsrobrun.org is not affiliated with Kefir Games or Easy Anti-Cheat. No cheat is ban-proof; use at your own risk.
+- Community forum (`/forum/`) is for buyers and is excluded from search indexing (`noindex`).
+- Checkout uses a third-party secure partner; duration pricing (e.g. 24h/7d/30d) appears at checkout, not in static copy.
+- For patch status, check the homepage banner and Discord #status before launching the loader.
